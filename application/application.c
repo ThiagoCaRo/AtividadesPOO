@@ -243,6 +243,7 @@ UART_Params uartrxParams;
 static sem_t sem;
 int tsig=0;
 bool diff_t = false;
+bool diff_m = false;
 //char state2 = 'X';
 
 //medidas
@@ -362,6 +363,7 @@ bool nbyte(uint8_t value)
 
         clock_gettime(CLOCK_REALTIME, &start_r);
         //puts("DO 5 PARA O S");
+        diff_m = false;
         state = 'S';
 
       }
@@ -395,6 +397,7 @@ bool nbyte(uint8_t value)
         clock_gettime(CLOCK_REALTIME, &end_r);
         if(time_diff(&start_r, &end_r)>=1.0){
             state = 'A';
+            diff_m = true;
             count=0;
 
         }
@@ -407,6 +410,7 @@ bool nbyte(uint8_t value)
         state = 'T';
         clock_gettime(CLOCK_REALTIME, &end_r);
         if(time_diff(&start_r, &end_r)>=1.0){
+            diff_m = true;
             state = 'A';
 
         }
@@ -419,6 +423,7 @@ bool nbyte(uint8_t value)
       state = 'E';
       clock_gettime(CLOCK_REALTIME, &end_r);
       if(time_diff(&start_r, &end_r)>=1.0){
+          diff_m = true;
           state = 'A';
 
       }
@@ -431,6 +436,7 @@ bool nbyte(uint8_t value)
       state = 'I';
       clock_gettime(CLOCK_REALTIME, &end_r);
       if(time_diff(&start_r, &end_r)>=1.0){
+          diff_m = true;
           state = 'A';
 
       }
@@ -443,6 +449,7 @@ bool nbyte(uint8_t value)
       state = 'D';
       clock_gettime(CLOCK_REALTIME, &end_r);
       if(time_diff(&start_r, &end_r)>=1.0){
+          diff_m = true;
           state = 'A';
 
       }
@@ -467,6 +474,7 @@ bool nbyte(uint8_t value)
         count++;
         clock_gettime(CLOCK_REALTIME, &end_r);
         if(time_diff(&start_r, &end_r)>=1.0){
+            diff_m = true;
             state = 'A';
             count=0;
         }
@@ -479,6 +487,7 @@ bool nbyte(uint8_t value)
         state = 'C';
         clock_gettime(CLOCK_REALTIME, &end_r);
         if(time_diff(&start_r, &end_r)>=1.0){
+            diff_m = true;
             state = 'A';
         }
         //puts("DO D PARA O C");
@@ -491,6 +500,7 @@ bool nbyte(uint8_t value)
         count++;
         clock_gettime(CLOCK_REALTIME, &end_r);
         if(time_diff(&start_r, &end_r)>=1.0){
+            diff_m = true;
             state = 'A';
             count=0;
         }
@@ -504,12 +514,16 @@ bool nbyte(uint8_t value)
         calcrc((uint8_t*)dat, CRCc, tamaux + 6);
         clock_gettime(CLOCK_REALTIME, &end_r);
         if(time_diff(&start_r, &end_r)>=1.0){
+            diff_m = true;
             state = 'A';
         }
 
         if ((CRCc[0] == CRCr[0]) & (CRCc[1] == CRCr[1]))
         {
           done = true;
+        }
+        else{
+            diff_m = true;
         }
         state = 'A';
         //puts("DO C PARA O A");
@@ -1098,6 +1112,10 @@ int res_get_handler_medida_01(int8_t service_id, uint8_t source_address[static 1
         strcpy((char *)def_rt_str, "ERRO_ \0");
         def_rt_str[5] = TIMEOUT_ERRO_1 + 48;
     }
+    else if(diff_m==true){
+        strcpy((char *)def_rt_str, "ERRO_ \0");
+        def_rt_str[5] = PIMA_ERRO_1 + 48;
+    }
     coap_service_response_send(service_id, 0, request_ptr, COAP_MSG_CODE_RESPONSE_CONTENT,
                                        COAP_CT_TEXT_PLAIN, def_rt_str, sizeof(def_rt_str));
     return 0;
@@ -1123,6 +1141,10 @@ int res_get_handler_medida_02(int8_t service_id, uint8_t source_address[static 1
       else if(diff_t==true){
           strcpy((char *)def_rt_str, "ERRO_ \0");
           def_rt_str[5] = TIMEOUT_ERRO_1 + 48;
+      }
+      else if(diff_m==true){
+          strcpy((char *)def_rt_str, "ERRO_ \0");
+          def_rt_str[5] = PIMA_ERRO_1 + 48;
       }
 
       /*-------------- RESPOSTA DO COAP PARA O GET --------------*/
@@ -1152,6 +1174,10 @@ int res_get_handler_medida_03(int8_t service_id, uint8_t source_address[static 1
           strcpy((char *)def_rt_str, "ERRO_ \0");
           def_rt_str[5] = TIMEOUT_ERRO_1 + 48;
       }
+      else if(diff_m==true){
+          strcpy((char *)def_rt_str, "ERRO_ \0");
+          def_rt_str[5] = PIMA_ERRO_1 + 48;
+      }
 
       /*-------------- RESPOSTA DO COAP PARA O GET --------------*/
       coap_service_response_send(service_id, 0, request_ptr, COAP_MSG_CODE_RESPONSE_CONTENT,
@@ -1178,6 +1204,10 @@ int res_get_handler_nserie_medidor(int8_t service_id, uint8_t source_address[sta
           strcpy((char *)def_rt_str, "ERRO_ \0");
           def_rt_str[5] = TIMEOUT_ERRO_1 + 48;
       }
+      else if(diff_m==true){
+          strcpy((char *)def_rt_str, "ERRO_ \0");
+          def_rt_str[5] = PIMA_ERRO_1 + 48;
+      }
 
       /*-------------- RESPOSTA DO COAP PARA O GET --------------*/
       coap_service_response_send(service_id, 0, request_ptr, COAP_MSG_CODE_RESPONSE_CONTENT,
@@ -1193,6 +1223,10 @@ int res_get_handler_state(int8_t service_id, uint8_t source_address[static 16], 
     if(diff_t==true){
         strcpy((char *)def_rt_str, "ERRO_ \0");
         def_rt_str[5] = TIMEOUT_ERRO_1 + 48;
+    }
+    else if(diff_m==true){
+        strcpy((char *)def_rt_str, "ERRO_ \0");
+        def_rt_str[5] = PIMA_ERRO_1 + 48;
     }
 
     /*-------------- RESPOSTA DO COAP PARA O GET --------------*/
