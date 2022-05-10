@@ -112,6 +112,9 @@ Defines & enums
 #define MY_GROUP 1
 #define NOT_INITIALIZED -1
 
+
+/*******************COAP DEFINITIONS*******************/
+
 #ifdef COAP_SERVICE_ENABLE
 #define COAP_PORT 5683
 #define COAP_LED "ep/sys/led1"
@@ -120,10 +123,26 @@ Defines & enums
 #define COAP_MED3 "meter/energ_reativa_ind_direta"
 #define COAP_NSERIE "meter/nserie"
 #define COAP_SOP "meter/sop"
+#define COAP_TEMP "ep/sys/temp"
+#define COAP_VCC "ep/sys/vcc"
+#define COAP_UPTIME "ep/sys/uptime"
+#define COAP_NAME "ep/fw/name"
+#define COAP_VERS "ep/fw/vers"
+#define COAP_IPV6 "ep/net/ipv6p"
+#define COAP_RESET "ep/sys/reset"
+#define COAP_BLKN "ep/load/blkn"
+#define COAP_ARGS "ep/net/args"
+#define COAP_CMD "ep/net/cmd"
+#define COAP_OADADR "ep/oad/addr"
+#define COAP_OADPORT "ep/oad/port"
+#define COAP_OADSOP "ep/oad/sop"
+
 #define COAP_RLED_ID 0
 #define COAP_GLED_ID 1
 
 #endif // COAP_SERVICE_ENABLE
+/*************************************************************/
+
 
 typedef enum connection_status {
     CON_STATUS_LOCAL_UP           = 0,        /*!< local IP address set */
@@ -226,7 +245,7 @@ int tamaux = 0;
 int escaux = 0;
 int indaux = 0;
 uint8_t byte;
-int SIGEXIT=0;
+bool SIGEXIT=false;
 char state = 'A';
 int count = 0;
 uint8_t D[DMS]; //data maximum size (data + ecopo + index)
@@ -234,16 +253,19 @@ uint8_t dat[DMS + 7]; //dados para o CRC
 
 int completo = CAMPOS;
 bool ler = false;
-struct timespec start;
-struct timespec end;
+struct timespec optimeI;
+struct timespec optimeF;
 struct timespec start_r;
 struct timespec end_r;
+double optime=0.0;
+double opaux=0.0;
 UART_Handle uartrx;
 UART_Params uartrxParams;
 static sem_t sem;
 int tsig=0;
 bool diff_t = false;
 bool diff_m = false;
+bool op_control = false;
 //char state2 = 'X';
 
 //medidas
@@ -276,12 +298,13 @@ uint8_t fromhex2bcd(uint8_t byte, uint8_t *nibblems, uint8_t *nibblels);
 Lib PIMA Functions
  *****************************************************************************/
 
-float time_diff(struct timespec *start, struct timespec *end){
+double time_diff(struct timespec *start, struct timespec *end){
     return (end->tv_sec - start->tv_sec) + 1e-9*(end->tv_nsec - start->tv_nsec);
 }
 
 void uart_rx_callback(UART_Handle handle, void *buffer, size_t count){
     diff_t=false;
+    op_control=true; //Apenas contabilizar uptime quando ler do medidor
     if(med(byte) && ler){
           // CONTIKI NG: JAMAIS FAZER TX NA UART DENTRO DA FUNCAO DE CALLBACK!
           //PRINTFD("%c",0x66); // debug somente
@@ -672,7 +695,7 @@ void ffmedidas(){
       }
       medidas.tam[i] = 0xFF;
     }
-    SIGEXIT=1;
+    SIGEXIT=true;
 }
 
 /******************************************************************************
@@ -1234,6 +1257,117 @@ int res_get_handler_state(int8_t service_id, uint8_t source_address[static 16], 
                                                              COAP_CT_TEXT_PLAIN, def_rt_str, sizeof(def_rt_str));
 
 }
+
+int res_get_handler_temp(int8_t service_id, uint8_t source_address[static 16], uint16_t source_port, sn_coap_hdr_s *request_ptr){
+    uint8_t def_rt_str[10] = "\0\0\0\0\0\0\0\0\0\0";
+
+    coap_service_response_send(service_id, 0, request_ptr, COAP_MSG_CODE_RESPONSE_CONTENT,
+                                                                 COAP_CT_TEXT_PLAIN, def_rt_str, sizeof(def_rt_str));
+}
+
+int res_get_handler_vcc(int8_t service_id, uint8_t source_address[static 16], uint16_t source_port, sn_coap_hdr_s *request_ptr){
+    uint8_t def_rt_str[10] = "\0\0\0\0\0\0\0\0\0\0";
+
+    coap_service_response_send(service_id, 0, request_ptr, COAP_MSG_CODE_RESPONSE_CONTENT,
+                                                                 COAP_CT_TEXT_PLAIN, def_rt_str, sizeof(def_rt_str));
+}
+
+int res_get_handler_uptime(int8_t service_id, uint8_t source_address[static 16], uint16_t source_port, sn_coap_hdr_s *request_ptr){
+    uint8_t def_rt_str[10];
+
+
+    if(diff_t==true){
+        if(opaux>=0.0){
+            snprintf(def_rt_str, 10, "%lf", opaux);
+        }
+        else{
+            snprintf(def_rt_str, 10, "%lf", 0.0);
+        }
+
+    }
+
+    else{
+        snprintf(def_rt_str, 10, "%lf", optime);
+    }
+
+
+
+    coap_service_response_send(service_id, 0, request_ptr, COAP_MSG_CODE_RESPONSE_CONTENT,
+                                                                 COAP_CT_TEXT_PLAIN, def_rt_str, sizeof(def_rt_str));
+}
+
+int res_get_handler_name(int8_t service_id, uint8_t source_address[static 16], uint16_t source_port, sn_coap_hdr_s *request_ptr){
+    uint8_t def_rt_str[10] = "\0\0\0\0\0\0\0\0\0\0";
+
+    coap_service_response_send(service_id, 0, request_ptr, COAP_MSG_CODE_RESPONSE_CONTENT,
+                                                                 COAP_CT_TEXT_PLAIN, def_rt_str, sizeof(def_rt_str));
+}
+
+int res_get_handler_vers(int8_t service_id, uint8_t source_address[static 16], uint16_t source_port, sn_coap_hdr_s *request_ptr){
+    uint8_t def_rt_str[10] = "\0\0\0\0\0\0\0\0\0\0";
+
+    coap_service_response_send(service_id, 0, request_ptr, COAP_MSG_CODE_RESPONSE_CONTENT,
+                                                                 COAP_CT_TEXT_PLAIN, def_rt_str, sizeof(def_rt_str));
+}
+
+int res_get_handler_ipv6(int8_t service_id, uint8_t source_address[static 16], uint16_t source_port, sn_coap_hdr_s *request_ptr){
+    uint8_t def_rt_str[10] = "\0\0\0\0\0\0\0\0\0\0";
+
+    coap_service_response_send(service_id, 0, request_ptr, COAP_MSG_CODE_RESPONSE_CONTENT,
+                                                                 COAP_CT_TEXT_PLAIN, def_rt_str, sizeof(def_rt_str));
+}
+
+int res_post_handler_reset(int8_t service_id, uint8_t source_address[static 16], uint16_t source_port, sn_coap_hdr_s *request_ptr){
+    uint8_t def_rt_str[10] = "\0\0\0\0\0\0\0\0\0\0";
+
+    coap_service_response_send(service_id, 0, request_ptr, COAP_MSG_CODE_RESPONSE_CHANGED,
+                                           COAP_CT_TEXT_PLAIN, NULL, 0);
+}
+
+int res_get_handler_blkn(int8_t service_id, uint8_t source_address[static 16], uint16_t source_port, sn_coap_hdr_s *request_ptr){
+    uint8_t def_rt_str[10] = "\0\0\0\0\0\0\0\0\0\0";
+
+    coap_service_response_send(service_id, 0, request_ptr, COAP_MSG_CODE_RESPONSE_CONTENT,
+                                                                 COAP_CT_TEXT_PLAIN, def_rt_str, sizeof(def_rt_str));
+}
+
+int res_get_handler_args(int8_t service_id, uint8_t source_address[static 16], uint16_t source_port, sn_coap_hdr_s *request_ptr){
+    uint8_t def_rt_str[10] = "\0\0\0\0\0\0\0\0\0\0";
+
+    coap_service_response_send(service_id, 0, request_ptr, COAP_MSG_CODE_RESPONSE_CONTENT,
+                                                                 COAP_CT_TEXT_PLAIN, def_rt_str, sizeof(def_rt_str));
+}
+
+int res_get_handler_cmd(int8_t service_id, uint8_t source_address[static 16], uint16_t source_port, sn_coap_hdr_s *request_ptr){
+    uint8_t def_rt_str[10] = "\0\0\0\0\0\0\0\0\0\0";
+
+    coap_service_response_send(service_id, 0, request_ptr, COAP_MSG_CODE_RESPONSE_CONTENT,
+                                                                 COAP_CT_TEXT_PLAIN, def_rt_str, sizeof(def_rt_str));
+}
+
+int res_get_handler_oadadr(int8_t service_id, uint8_t source_address[static 16], uint16_t source_port, sn_coap_hdr_s *request_ptr){
+    uint8_t def_rt_str[10] = "\0\0\0\0\0\0\0\0\0\0";
+
+    coap_service_response_send(service_id, 0, request_ptr, COAP_MSG_CODE_RESPONSE_CONTENT,
+                                                                 COAP_CT_TEXT_PLAIN, def_rt_str, sizeof(def_rt_str));
+}
+
+int res_get_handler_oadport(int8_t service_id, uint8_t source_address[static 16], uint16_t source_port, sn_coap_hdr_s *request_ptr){
+    uint8_t def_rt_str[10] = "\0\0\0\0\0\0\0\0\0\0";
+
+    coap_service_response_send(service_id, 0, request_ptr, COAP_MSG_CODE_RESPONSE_CONTENT,
+                                                                 COAP_CT_TEXT_PLAIN, def_rt_str, sizeof(def_rt_str));
+}
+
+int res_get_handler_oadsop(int8_t service_id, uint8_t source_address[static 16], uint16_t source_port, sn_coap_hdr_s *request_ptr){
+    uint8_t def_rt_str[10] = "\0\0\0\0\0\0\0\0\0\0";
+
+    coap_service_response_send(service_id, 0, request_ptr, COAP_MSG_CODE_RESPONSE_CONTENT,
+                                                                 COAP_CT_TEXT_PLAIN, def_rt_str, sizeof(def_rt_str));
+}
+
+
+
 #endif // COAP_SERVICE_ENABLE
 
 #ifndef WISUN_NCP_ENABLE
@@ -1265,7 +1399,7 @@ void *threadInicial(void *arg0){
 
       ffmedidas();
 
-      if(SIGEXIT==1){
+      if(SIGEXIT==true){
           pthread_exit();
       }
 
@@ -1274,17 +1408,47 @@ void *threadInicial(void *arg0){
 
 void *threadSecundaria(void *arg0){
     clock_gettime(CLOCK_REALTIME, &start_r);
+    clock_gettime(CLOCK_REALTIME, &optimeI);
     while (1)
       {
 
         ler = true;
+
+        if(diff_t==true){
+            clock_gettime(CLOCK_REALTIME, &optimeI);
+        }
+
         UART_read(uartrx, &byte, sizeof(uint8_t));
+
         clock_gettime(CLOCK_REALTIME, &end_r);
+
+        if(op_control==false){
+            optime=0.0;
+
+        }
+
+        else{
+            clock_gettime(CLOCK_REALTIME, &optimeF);
+            optime=time_diff(&optimeI, &optimeF);
+        }
+
+
+
+
         if(time_diff(&start_r, &end_r)>=60.0){
             diff_t=true;
             clock_gettime(CLOCK_REALTIME, &start_r);
 
+            if(optime!=0){
+                opaux=optime-60.0;
+            }
+            op_control=false;
+
+
         }
+
+
+
         //sem_wait(&sem);
 
 
@@ -1364,26 +1528,87 @@ void *mainThread(void *arg0)
     //IMPORTANTE!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 #elif defined(COAP_SERVICE_ENABLE)
     service_id = coap_service_initialize(interface_id, COAP_PORT, 0, NULL, NULL);
+
     coap_service_register_uri(service_id, COAP_LED,
                               COAP_SERVICE_ACCESS_GET_ALLOWED |
                               COAP_SERVICE_ACCESS_PUT_ALLOWED |
                               COAP_SERVICE_ACCESS_POST_ALLOWED,
                               coap_recv_cb);
+
     coap_service_register_uri(service_id, COAP_MED1,
                                   COAP_SERVICE_ACCESS_GET_ALLOWED,
                                   res_get_handler_medida_01);
+
     coap_service_register_uri(service_id, COAP_MED2,
                                       COAP_SERVICE_ACCESS_GET_ALLOWED,
                                       res_get_handler_medida_02);
+
     coap_service_register_uri(service_id, COAP_MED3,
                                           COAP_SERVICE_ACCESS_GET_ALLOWED,
                                           res_get_handler_medida_03);
+
     coap_service_register_uri(service_id, COAP_NSERIE,
                                           COAP_SERVICE_ACCESS_GET_ALLOWED,
                                           res_get_handler_nserie_medidor);
+
     coap_service_register_uri(service_id, COAP_SOP,
                                               COAP_SERVICE_ACCESS_GET_ALLOWED,
                                               res_get_handler_state);
+
+    coap_service_register_uri(service_id, COAP_TEMP,
+                                                  COAP_SERVICE_ACCESS_GET_ALLOWED,
+                                                  res_get_handler_temp);
+
+    coap_service_register_uri(service_id, COAP_VCC,
+                                                      COAP_SERVICE_ACCESS_GET_ALLOWED,
+                                                      res_get_handler_vcc);
+
+    coap_service_register_uri(service_id, COAP_UPTIME,
+                                                              COAP_SERVICE_ACCESS_POST_ALLOWED,
+                                                              res_get_handler_uptime);
+    coap_service_register_uri(service_id, COAP_NAME,
+                                                              COAP_SERVICE_ACCESS_POST_ALLOWED,
+                                                              res_get_handler_name);
+
+    coap_service_register_uri(service_id, COAP_VERS,
+                                                              COAP_SERVICE_ACCESS_POST_ALLOWED,
+                                                              res_get_handler_vers);
+
+    coap_service_register_uri(service_id, COAP_IPV6,
+                                                              COAP_SERVICE_ACCESS_POST_ALLOWED,
+                                                              res_get_handler_ipv6);
+
+
+
+    coap_service_register_uri(service_id, COAP_RESET,
+                                                          COAP_SERVICE_ACCESS_POST_ALLOWED,
+                                                          res_post_handler_reset);
+
+    coap_service_register_uri(service_id, COAP_BLKN,
+                                                              COAP_SERVICE_ACCESS_POST_ALLOWED,
+                                                              res_get_handler_blkn);
+
+    coap_service_register_uri(service_id, COAP_ARGS,
+                                                              COAP_SERVICE_ACCESS_POST_ALLOWED,
+                                                              res_get_handler_args);
+
+    coap_service_register_uri(service_id, COAP_CMD,
+                                                              COAP_SERVICE_ACCESS_POST_ALLOWED,
+                                                              res_get_handler_cmd);
+
+    coap_service_register_uri(service_id, COAP_OADADR,
+                                                              COAP_SERVICE_ACCESS_POST_ALLOWED,
+                                                              res_get_handler_oadadr);
+
+    coap_service_register_uri(service_id, COAP_OADPORT,
+                                                              COAP_SERVICE_ACCESS_POST_ALLOWED,
+                                                              res_get_handler_oadport);
+
+    coap_service_register_uri(service_id, COAP_OADSOP,
+                                                              COAP_SERVICE_ACCESS_POST_ALLOWED,
+                                                              res_get_handler_oadsop);
+
+
 #else
     /* Convert string addr to ipaddr array */
     stoip6(multicast_addr_str, strlen(multicast_addr_str), multi_cast_addr);
